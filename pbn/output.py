@@ -56,6 +56,33 @@ def outlines_mm(plan):
     return segs
 
 
+def number_labels(plan):
+    """(x mm, y mm, text, font size pt) for each area's number, on the page."""
+    ox, oy = plan.area_mm[:2]
+    for rid in range(1, plan.n_regions + 1):
+        row, col = plan.region_pos[rid]
+        r_mm = plan.region_radius[rid] / PX_PER_MM
+        yield ((col + 0.5) / PX_PER_MM + ox, (row + 0.5) / PX_PER_MM + oy,
+               str(plan.region_color[rid] + 1), float(np.clip(4 * r_mm, 4.5, 8)))
+
+
+def template_svg(plan):
+    """The outline page as SVG in mm, for viewing on screen (same lines and numbers as the PDF)."""
+    w, h = plan.page_mm
+    gray = round(LINE_GRAY * 255)
+    paths = " ".join("M" + " ".join(f"{x:.1f},{y:.1f}" for x, y in seg) + "Z"
+                     for seg in outlines_mm(plan))
+    texts = "".join(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{pt * 25.4 / 72:.2f}">{t}</text>'
+                    for x, y, t, pt in number_labels(plan))
+    num = round(NUMBER_GRAY * 255)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
+            f'width="{w}mm" height="{h}mm"><rect width="{w}" height="{h}" fill="#fff"/>'
+            f'<path d="{paths}" fill="none" stroke="rgb({gray},{gray},{gray})" '
+            f'stroke-width="{LINE_PT * 25.4 / 72:.3f}" stroke-linejoin="round"/>'
+            f'<g font-family="DejaVu Sans, sans-serif" fill="rgb({num},{num},{num})" '
+            f'text-anchor="middle" dominant-baseline="central">{texts}</g></svg>')
+
+
 def page(w_mm, h_mm):
     fig = plt.figure(figsize=(w_mm / 25.4, h_mm / 25.4))
     ax = fig.add_axes([0, 0, 1, 1])
@@ -70,12 +97,8 @@ def template_page(plan, title, placeholder):
     ax.add_collection(LineCollection(outlines_mm(plan), linewidths=LINE_PT,
                                      colors=[(LINE_GRAY,) * 3], joinstyle="round"))
     ox, oy = plan.area_mm[:2]
-    for rid in range(1, plan.n_regions + 1):
-        r_mm = plan.region_radius[rid] / PX_PER_MM
-        row, col = plan.region_pos[rid]
-        ax.text((col + 0.5) / PX_PER_MM + ox, (row + 0.5) / PX_PER_MM + oy,
-                str(plan.region_color[rid] + 1), fontsize=float(np.clip(4 * r_mm, 4.5, 8)),
-                ha="center", va="center", color=(NUMBER_GRAY,) * 3)
+    for x, y, text, size_pt in number_labels(plan):
+        ax.text(x, y, text, fontsize=size_pt, ha="center", va="center", color=(NUMBER_GRAY,) * 3)
     footer = f"{title} · {plan.fmt} · {len(plan.colors)} Farben · {plan.n_regions} Flächen"
     if placeholder:
         footer += " · " + PLACEHOLDER_NOTE

@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malen nach Zahlen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;750&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --board: #e4e8e6;        /* primed board the sheets lie on */
+    --board-line: #cfd5d2;
+    --paper: #ffffff;
+    --ink: #23262b;          /* graphite */
+    --graphite: #5b626a;
+    --pencil: #8e949b;       /* the template's line gray */
+    --ultramarine: #2b3fb8;
+    --ultramarine-wash: #e2e5f6;
+    --warn: #9a3b1e;
+    --radius-sheet: 2px;
+    --radius-control: 8px;
+    font-family: "Commissioner", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--board);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--board); font-size: 16px; line-height: 1.45; }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--ultramarine); outline-offset: 3px; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 16px; padding: 18px 0 8px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; font-weight: 750; letter-spacing: -0.01em; margin: 0; margin-right: auto; }
+  .photo-name { color: var(--graphite); font-size: 15px; }
+  .btn {
+    border: 1px solid var(--ink); background: var(--paper); border-radius: var(--radius-control);
+    padding: 8px 16px; cursor: pointer; font-weight: 500;
+  }
+  .btn:hover { background: #f4f5f4; }
+  .btn.primary { background: var(--ultramarine); border-color: var(--ultramarine); color: #fff; font-weight: 600; }
+  .btn.primary:hover { background: #2334a0; }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  /* Settings */
+  details.settings { position: relative; }
+  details.settings > summary { list-style: none; }
+  details.settings > summary::-webkit-details-marker { display: none; }
+  .settings-panel {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 5; width: 320px;
+    background: var(--paper); border-radius: var(--radius-control); padding: 18px;
+    box-shadow: 0 1px 2px rgba(35,38,43,.12), 0 12px 32px rgba(35,38,43,.16);
+  }
+  .field { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 4px 12px; margin-bottom: 14px; }
+  .field label { font-weight: 500; }
+  .field small { grid-column: 1 / -1; color: var(--graphite); font-size: 13px; }
+  .field input { width: 84px; padding: 6px 8px; border: 1px solid var(--board-line); border-radius: 6px; text-align: right; }
+
+  /* Empty state */
+  .drop {
+    margin: 48px auto 0; max-width: 720px; aspect-ratio: 297 / 210; background: var(--paper);
+    border-radius: var(--radius-sheet); box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 18px 40px rgba(35,38,43,.12);
+    display: grid; place-content: center; text-align: center; gap: 14px; padding: 32px;
+    outline: 1.5px dashed transparent; outline-offset: -18px; cursor: pointer;
+  }
+  .drop.over { outline-color: var(--ultramarine); }
+  .drop h2 { font-size: 30px; font-weight: 750; margin: 0; letter-spacing: -0.015em; }
+  .drop p { margin: 0; color: var(--graphite); max-width: 46ch; }
+  .drop .btn { justify-self: center; }
+
+  /* The three sheets, at true relative size */
+  .table { margin-top: 28px; }
+  .sheets { display: flex; align-items: flex-end; justify-content: center; gap: 28px; }
+  .sheet-col { display: flex; flex-direction: column; gap: 12px; }
+  .sheet {
+    position: relative; background: var(--paper); border: 0; padding: 0; cursor: pointer;
+    border-radius: var(--radius-sheet);
+    box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 10px 26px rgba(35,38,43,.12);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .sheet:hover:not(:disabled) { transform: translateY(-3px); }
+  .sheet[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ultramarine), 0 14px 30px rgba(43,63,184,.22); }
+  .sheet:disabled { cursor: progress; }
+  .sheet img, .sheet .pending { position: absolute; }
+  .sheet img { width: 100%; height: 100%; object-fit: fill; }
+  .sheet .pending { inset: 0; display: grid; place-items: center; overflow: hidden; }
+  .pending .ghost { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: .18; filter: grayscale(1); }
+  .pending span { position: relative; color: var(--graphite); font-size: 14px; }
+  .pending::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 30%;
+    background: var(--ultramarine); animation: slide 1.6s ease-in-out infinite;
+  }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  .caption { font-size: 14px; color: var(--graphite); }
+  .caption strong { display: flex; align-items: baseline; gap: 10px; font-size: 20px; color: var(--ink); font-weight: 750; }
+  .caption strong em {
+    font-style: normal; font-size: 13px; font-weight: 600; color: var(--ultramarine);
+    background: var(--ultramarine-wash); border-radius: 99px; padding: 1px 10px;
+  }
+  .caption p { margin: 2px 0 0; }
+  .reasons { max-width: 760px; margin: 22px auto 0; color: var(--graphite); font-size: 15px; }
+  .reasons p { margin: 4px 0; }
+  .note { color: var(--warn); font-size: 14px; }
+  .error { max-width: 720px; margin: 24px auto; background: var(--paper); border-left: 4px solid var(--warn); padding: 12px 16px; }
+
+  /* Detail: viewer + color list */
+  .detail { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; margin: 40px 0 56px; align-items: start; }
+  .detail h2 { font-size: 22px; margin: 0 0 4px; font-weight: 750; letter-spacing: -0.01em; }
+  .viewer-tools { display: flex; align-items: center; gap: 14px; margin: 10px 0 12px; flex-wrap: wrap; color: var(--graphite); font-size: 14px; }
+  .viewer-tools input[type=range] { width: 220px; accent-color: var(--ultramarine); }
+  .zoom { display: inline-flex; border: 1px solid var(--board-line); border-radius: var(--radius-control); overflow: hidden; margin-left: auto; }
+  .zoom button { border: 0; background: var(--paper); padding: 5px 12px; cursor: pointer; }
+  .zoom button[aria-pressed="true"] { background: var(--ultramarine-wash); color: var(--ultramarine); font-weight: 600; }
+  .viewport { overflow: auto; max-height: 78vh; border-radius: var(--radius-sheet); box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 18px 40px rgba(35,38,43,.12); background: var(--paper); }
+  .page { position: relative; }
+  .page > img, .painted { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .painted img { position: absolute; }
+  .wipe { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ultramarine); pointer-events: none; }
+
+  .colors { background: var(--paper); border-radius: var(--radius-control); padding: 18px 18px 8px; box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 10px 26px rgba(35,38,43,.10); }
+  .colors > p { margin: 0 0 12px; color: var(--graphite); font-size: 14px; }
+  .export { display: grid; gap: 8px; margin-bottom: 16px; }
+  .export small { color: var(--graphite); font-size: 13px; }
+  ol.list { list-style: none; margin: 0; padding: 0; max-height: 62vh; overflow: auto; }
+  ol.list li { display: grid; grid-template-columns: 34px 30px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eef0ef; }
+  .swatch { width: 34px; height: 26px; border-radius: 13px 9px 12px 8px; box-shadow: inset 0 0 0 1px rgba(35,38,43,.12); }
+  .nr { font-weight: 750; font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
+  .what { font-size: 14px; line-height: 1.3; }
+  .what small { display: block; color: var(--graphite); font-size: 12.5px; margin-top: 2px; }
+  .need { font-size: 14px; color: var(--graphite); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .stopped { max-width: 720px; margin: 48px auto; background: var(--paper); padding: 20px 24px; border-radius: var(--radius-control); }
+  [hidden] { display: none !important; }
+  @media (max-width: 980px) {
+    .detail { grid-template-columns: 1fr; }
+    .sheets { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet { transition: none; }
+    .pending::after { animation: none; width: 100%; opacity: .35; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Malen nach Zahlen</h1>
+    <span class="photo-name" id="photoName"></span>
+    <button class="btn" id="newPhoto" hidden>Anderes Foto</button>
+    <details class="settings" id="settings">
+      <summary class="btn">Einstellungen</summary>
+      <div class="settings-panel">
+        <div class="field"><label for="farben">Farben höchstens</label><input id="farben" type="number" min="2" max="48" value="30"></div>
+        <div class="field"><label for="rezepte">Mischrezepte höchstens</label><input id="rezepte" type="number" min="0" max="30" value="8"><small>Aufhellungen mit Weiß zählen nicht mit.</small></div>
+        <div class="field"><label for="min_breite">Mindestbreite (mm)</label><input id="min_breite" type="number" min="2" step="0.1" value="2.5"><small>So breit ist jede Fläche an ihrer breitesten Stelle, damit die Zahl hineinpasst.</small></div>
+        <div class="field"><label for="min_engstelle">Engstellen (mm)</label><input id="min_engstelle" type="number" min="0.5" step="0.1" value="1.5"><small>Schmalere Spitzen und Stege gehen an die Nachbarflächen.</small></div>
+        <button class="btn primary" id="recompute" disabled>Neu berechnen</button>
+      </div>
+    </details>
+    <button class="btn" id="quit">Beenden</button>
+  </header>
+  <p class="stopped" id="stopped" hidden>Malen nach Zahlen ist beendet. Du kannst dieses Fenster schließen und das Programm jederzeit wieder über das Symbol starten.</p>
+
+  <input type="file" id="file" accept="image/*" hidden>
+
+  <section class="drop" id="drop" tabindex="0" aria-label="Foto auswählen">
+    <h2>Welches Foto möchtest du malen?</h2>
+    <p>Zieh ein Foto hierher. Du siehst es danach als A4, A3 und A2 nebeneinander und wählst das Format, das du malen möchtest.</p>
+    <button class="btn primary" id="pick" type="button">Foto auswählen</button>
+  </section>
+
+  <div class="error" id="error" hidden></div>
+
+  <section class="table" id="table" hidden aria-label="Formate">
+    <div class="sheets" id="sheets"></div>
+    <div class="reasons" id="reasons"></div>
+  </section>
+
+  <section class="detail" id="detail" hidden>
+    <div>
+      <h2 id="detailTitle"></h2>
+      <div class="viewer-tools">
+        <label for="wipe">Vorlage</label>
+        <input type="range" id="wipe" min="0" max="100" value="50" aria-label="Zwischen Vorlage und gemalter Vorschau wechseln">
+        <span>Gemalt</span>
+        <div class="zoom" role="group" aria-label="Vergrößerung">
+          <button data-zoom="1" aria-pressed="true">Ganz</button>
+          <button data-zoom="2" aria-pressed="false">2×</button>
+          <button data-zoom="4" aria-pressed="false">4×</button>
+        </div>
+      </div>
+      <div class="viewport" id="viewport">
+        <div class="page" id="page">
+          <img id="templateImg" alt="Vorlage mit Linien und Zahlen">
+          <div class="painted" id="painted"><img id="paintedImg" alt="Vorschau in den Malfarben"></div>
+          <div class="wipe" id="wipeLine"></div>
+        </div>
+      </div>
+    </div>
+    <aside class="colors">
+      <div class="export">
+        <button class="btn primary" id="exportBtn">Vorlage exportieren</button>
+        <small>Eine ZIP-Datei mit der Druckvorlage als PDF (Linien, Farbliste, Vorschau), der Vorlage als SVG, der Vorschau als PNG und der Farbliste als CSV.</small>
+      </div>
+      <p id="colorsSummary"></p>
+      <p class="note" id="placeholderNote" hidden>Die Farben sind Platzhalter, bis dein Ausstreichblatt kalibriert ist. Rezepte und Vorschau sind deshalb noch nicht verlässlich.</p>
+      <ol class="list" id="colorList"></ol>
+    </aside>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtNum = (v, d = 0) => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtGrams = g => g < 0.05 ? "< 0,1 g" : fmtNum(g, 1) + " g";
+const fmtCm = mm => fmtNum(mm / 10, 1).replace(",0", "");
+let job = null, status = null, chosen = null, lastFile = null, poll = null, zoom = 1;
+
+function params() {
+  const q = new URLSearchParams();
+  for (const k of ["farben", "rezepte", "min_breite", "min_engstelle"]) q.set(k, $(k).value);
+  return q;
+}
+
+function showError(msg) { $("error").textContent = msg; $("error").hidden = !msg; }
+
+async function upload(file) {
+  lastFile = file;
+  showError("");
+  chosen = null;
+  $("detail").hidden = true;
+  $("drop").hidden = true;
+  $("newPhoto").hidden = false;
+  $("photoName").textContent = file.name;
+  $("recompute").disabled = true;
+  const res = await fetch("/api/jobs?" + params(), {
+    method: "POST", body: file, headers: { "X-Filename": encodeURIComponent(file.name) } });
+  const data = await res.json();
+  if (!res.ok) { showError(data.error); $("drop").hidden = false; return; }
+  job = data.id;
+  status = null;
+  $("table").hidden = false;
+  clearInterval(poll);
+  await refresh();
+  poll = setInterval(refresh, 1000);
+}
+
+async function refresh() {
+  const res = await fetch(`/api/jobs/${job}`);
+  const data = await res.json();
+  if (!res.ok) { clearInterval(poll); showError(data.error); return; }
+  const before = status;
+  status = data;
+  if (data.error) { clearInterval(poll); showError(data.error); }
+  renderSheets(before);
+  if (data.recommendation) {
+    clearInterval(poll);
+    if (!chosen) choose(data.recommendation);
+  }
+}
+
+function sheetScale() {
+  const fs = status.formats;
+  const avail = Math.min($("table").clientWidth || 1200, 1320) - 28 * (fs.length - 1);
+  const totalW = fs.reduce((s, f) => s + f.page_mm[0], 0);
+  const maxH = Math.max(...fs.map(f => f.page_mm[1]));
+  return Math.min(avail / totalW, Math.max(window.innerHeight * 0.52, 300) / maxH);
+}
+
+function renderSheets(before) {
+  const scale = sheetScale();
+  const box = $("sheets");
+  if (!before || before.id !== status.id) box.innerHTML = "";
+  for (const f of status.formats) {
+    let col = box.querySelector(`[data-fmt="${f.fmt}"]`);
+    if (!col) {
+      col = document.createElement("div");
+      col.className = "sheet-col";
+      col.dataset.fmt = f.fmt;
+      col.innerHTML = `<button class="sheet" disabled aria-pressed="false" aria-label="${f.fmt} wählen">
+          <div class="pending"><img class="ghost" alt="" src="/api/jobs/${job}/photo.jpg"><span>wird berechnet</span></div>
+        </button><div class="caption"></div>`;
+      col.querySelector(".sheet").addEventListener("click", () => choose(f.fmt));
+      box.appendChild(col);
+    }
+    const sheet = col.querySelector(".sheet");
+    sheet.style.width = f.page_mm[0] * scale + "px";
+    sheet.style.height = f.page_mm[1] * scale + "px";
+    const wasDone = before && before.id === status.id && before.formats.find(b => b.fmt === f.fmt).done;
+    if (f.done && !wasDone) {
+      const [ax, ay, aw, ah] = f.area_mm, [pw, ph] = f.page_mm;
+      sheet.innerHTML = `<img alt="Vorschau ${f.fmt}" src="/api/jobs/${job}/${f.fmt}/preview.png"
+        style="left:${ax / pw * 100}%;top:${ay / ph * 100}%;width:${aw / pw * 100}%;height:${ah / ph * 100}%">`;
+      sheet.disabled = false;
+    }
+    const s = f.summary, rec = status.recommendation === f.fmt;
+    col.querySelector(".caption").innerHTML = `<strong>${f.fmt}${rec ? "<em>Empfohlen</em>" : ""}</strong>` + (s
+      ? `<p>${fmtNum(s.regions)} Flächen, etwa ${fmtNum(s.hours)} Stunden</p>
+         <p>${Math.round(s.contours * 100)} % der Konturen erhalten</p>
+         <p>${s.tubes} Tuben, ${s.tints} Aufhellungen, ${s.recipes} Rezepte</p>`
+      : `<p>${fmtCm(f.page_mm[0])} × ${fmtCm(f.page_mm[1])} cm</p>`);
+  }
+  $("reasons").innerHTML = status.recommendation
+    ? status.reasons.map(r => `<p>${r}</p>`).join("") : "";
+  markChosen();
+}
+
+function markChosen() {
+  for (const s of document.querySelectorAll(".sheet-col"))
+    s.querySelector(".sheet").setAttribute("aria-pressed", String(s.dataset.fmt === chosen));
+}
+
+async function choose(fmt) {
+  chosen = fmt;
+  markChosen();
+  const f = status.formats.find(x => x.fmt === fmt);
+  const [pw, ph] = f.page_mm, [ax, ay, aw, ah] = f.area_mm;
+  $("detailTitle").textContent = `${fmt}, ${fmtCm(pw)} × ${fmtCm(ph)} cm`;
+  $("page").style.aspectRatio = `${pw} / ${ph}`;
+  $("templateImg").src = `/api/jobs/${job}/${fmt}/template.svg`;
+  const img = $("paintedImg");
+  img.src = `/api/jobs/${job}/${fmt}/preview.png`;
+  Object.assign(img.style, { left: ax / pw * 100 + "%", top: ay / ph * 100 + "%",
+                             width: aw / pw * 100 + "%", height: ah / ph * 100 + "%" });
+  applyWipe();
+  applyZoom();
+  $("detail").hidden = false;
+  const rows = await (await fetch(`/api/jobs/${job}/${fmt}/colors`)).json();
+  if (chosen !== fmt) return;
+  const grams = rows.reduce((s, r) => s + r.need, 0);
+  $("colorsSummary").textContent = `${rows.length} Farben, zusammen etwa ${fmtNum(grams)} g Farbe.`;
+  $("placeholderNote").hidden = !status.placeholder;
+  $("colorList").innerHTML = rows.map(r => `<li>
+      <span class="swatch" style="background:${r.srgb}"></span>
+      <span class="nr">${r.nr}</span>
+      <span class="what">${r.text}${r.weigh ? `<small>abwiegen: ${r.weigh}</small>` : ""}</span>
+      <span class="need">${fmtGrams(r.need)}</span></li>`).join("");
+}
+
+function applyWipe() {
+  const v = $("wipe").value;
+  $("painted").style.clipPath = `inset(0 ${100 - v}% 0 0)`;
+  $("wipeLine").style.left = `calc(${v}% - 1px)`;
+}
+
+function applyZoom() {
+  $("page").style.width = zoom * 100 + "%";
+  for (const b of document.querySelectorAll(".zoom button"))
+    b.setAttribute("aria-pressed", String(Number(b.dataset.zoom) === zoom));
+}
+
+$("pick").addEventListener("click", e => { e.stopPropagation(); $("file").click(); });
+$("drop").addEventListener("click", () => $("file").click());
+$("drop").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+$("newPhoto").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", e => { if (e.target.files[0]) upload(e.target.files[0]); e.target.value = ""; });
+for (const ev of ["dragenter", "dragover"])
+  document.addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); });
+for (const ev of ["dragleave", "drop"])
+  document.addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); });
+document.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) upload(f); });
+$("wipe").addEventListener("input", applyWipe);
+for (const b of document.querySelectorAll(".zoom button"))
+  b.addEventListener("click", () => { zoom = Number(b.dataset.zoom); applyZoom(); });
+for (const k of ["farben", "rezepte", "min_breite", "min_engstelle"])
+  $(k).addEventListener("input", () => { $("recompute").disabled = !lastFile; });
+$("recompute").addEventListener("click", () => { $("settings").open = false; if (lastFile) upload(lastFile); });
+$("exportBtn").addEventListener("click", () => { location.href = `/api/jobs/${job}/${chosen}/export.zip`; });
+$("quit").addEventListener("click", async () => {
+  clearInterval(poll);
+  await fetch("/api/quit", { method: "POST" }).catch(() => {});
+  for (const id of ["drop", "table", "detail", "error"]) $(id).hidden = true;
+  for (const el of document.querySelectorAll("header .btn, header details")) el.hidden = true;
+  $("stopped").hidden = false;
+});
+window.addEventListener("resize", () => { if (status) renderSheets(status); });
+</script>
+</body>
+</html>
