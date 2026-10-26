@@ -55,6 +55,16 @@
   .field { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 4px 12px; margin-bottom: 14px; }
   .field label { font-weight: 500; }
   .field small { grid-column: 1 / -1; color: var(--graphite); font-size: 13px; }
+  .pots-panel { width: 520px; }
+  .pots-panel li.off .swatch, .pots-panel li.off .nr, .pots-panel li.off .what { opacity: .4; }
+  .pot-all { display: flex; gap: 8px; margin-bottom: 10px; }
+  .pot-all .btn { padding: 4px 12px; font-size: 14px; }
+  .pot-ctl { display: grid; gap: 4px; justify-items: end; font-size: 13px; color: var(--graphite); }
+  .pot-ctl label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .export label { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+  .pots-panel > p { margin: 0 0 10px; color: var(--graphite); font-size: 14px; }
+  .pots-panel .list { max-height: 60vh; }
+  .field.check input { width: auto; justify-self: end; }
   .field input { width: 84px; padding: 6px 8px; border: 1px solid var(--board-line); border-radius: 6px; text-align: right; }
 
   /* Empty state */
@@ -104,6 +114,26 @@
   .note { color: var(--warn); font-size: 14px; }
   .error { max-width: 720px; margin: 24px auto; background: var(--paper); border-left: 4px solid var(--warn); padding: 12px 16px; }
 
+  /* Variants: the chosen format with other color/recipe limits, side by side */
+  .variants { margin-top: 40px; }
+  .variants h2 { font-size: 22px; margin: 0 0 4px; font-weight: 750; letter-spacing: -0.01em; }
+  .variants > p { margin: 0 0 16px; color: var(--graphite); font-size: 15px; max-width: 80ch; }
+  .variant-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; align-items: start; }
+  .variant { display: grid; gap: 8px; }
+  .variant-pick { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; display: grid; gap: 12px; }
+  .variant-pick:disabled { cursor: progress; }
+  .variant-img {
+    position: relative; width: 100%; background: var(--paper); border-radius: var(--radius-sheet);
+    box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 10px 26px rgba(35,38,43,.12);
+  }
+  .variant-img img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .variant-img .pending { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+  .variant-pick[aria-pressed="true"] .variant-img { box-shadow: 0 0 0 3px var(--ultramarine), 0 14px 30px rgba(43,63,184,.22); }
+  .variant-pick .caption strong { font-size: 17px; }
+  .variant-remove { justify-self: start; border: 0; background: none; padding: 0; color: var(--graphite); font-size: 14px; text-decoration: underline; cursor: pointer; }
+  .variant-add { background: var(--paper); border-radius: var(--radius-control); padding: 18px; box-shadow: 0 1px 1px rgba(35,38,43,.08), 0 10px 26px rgba(35,38,43,.10); }
+  .variant-add strong { display: block; margin-bottom: 12px; }
+
   /* Detail: viewer + color list */
   .detail { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; margin: 40px 0 56px; align-items: start; }
   .detail h2 { font-size: 22px; margin: 0 0 4px; font-weight: 750; letter-spacing: -0.01em; }
@@ -125,6 +155,8 @@
   ol.list { list-style: none; margin: 0; padding: 0; max-height: 62vh; overflow: auto; }
   ol.list li { display: grid; grid-template-columns: 34px 30px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eef0ef; }
   .swatch { width: 34px; height: 26px; border-radius: 13px 9px 12px 8px; box-shadow: inset 0 0 0 1px rgba(35,38,43,.12); }
+  #colorList li { grid-template-columns: 34px 30px 14px 1fr auto; }
+  .star { color: var(--ultramarine); font-size: 15px; }
   .nr { font-weight: 750; font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
   .what { font-size: 14px; line-height: 1.3; }
   .what small { display: block; color: var(--graphite); font-size: 12.5px; margin-top: 2px; }
@@ -133,7 +165,7 @@
   .stopped { max-width: 720px; margin: 48px auto; background: var(--paper); padding: 20px 24px; border-radius: var(--radius-control); }
   [hidden] { display: none !important; }
   @media (max-width: 980px) {
-    .detail { grid-template-columns: 1fr; }
+    .detail, .variant-row { grid-template-columns: 1fr; }
     .sheets { flex-wrap: wrap; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -153,9 +185,18 @@
       <div class="settings-panel">
         <div class="field"><label for="farben">Farben höchstens</label><input id="farben" type="number" min="2" max="48" value="30"></div>
         <div class="field"><label for="rezepte">Mischrezepte höchstens</label><input id="rezepte" type="number" min="0" max="30" value="8"><small>Aufhellungen mit Weiß zählen nicht mit.</small></div>
-        <div class="field"><label for="min_breite">Mindestbreite (mm)</label><input id="min_breite" type="number" min="2" step="0.1" value="2.5"><small>So breit ist jede Fläche an ihrer breitesten Stelle, damit die Zahl hineinpasst.</small></div>
-        <div class="field"><label for="min_engstelle">Engstellen (mm)</label><input id="min_engstelle" type="number" min="0.5" step="0.1" value="1.5"><small>Schmalere Spitzen und Stege gehen an die Nachbarflächen.</small></div>
+        <div class="field"><label for="min_breite">Mindestbreite (mm)</label><input id="min_breite" type="number" min="2" step="0.1" value="2.0"><small>So breit ist jede Fläche an ihrer breitesten Stelle, damit die Zahl hineinpasst.</small></div>
+        <div class="field"><label for="min_engstelle">Engstellen (mm)</label><input id="min_engstelle" type="number" min="0.5" step="0.1" value="1.0"><small>Schmalere Spitzen und Stege gehen an die Nachbarflächen.</small></div>
+        <div class="field check"><label for="weiss_lassen">Weißen Hintergrund frei lassen</label><input id="weiss_lassen" type="checkbox"><small>Weiße Flächen am Bildrand werden nicht bemalt und bekommen keine Zahl, z. B. bei Motiven auf weißem Grund.</small></div>
         <button class="btn primary" id="recompute" disabled>Neu berechnen</button>
+      </div>
+    </details>
+    <details class="settings" id="potsPanel">
+      <summary class="btn" id="potsBtn">Töpfe</summary>
+      <div class="settings-panel pots-panel">
+        <p id="potsInfo"></p>
+        <div class="pot-all"><button class="btn" type="button" id="potsAllOn">Alle verwenden</button><button class="btn" type="button" id="potsAllOff">Keine verwenden</button></div>
+        <ol class="list" id="potList"></ol>
       </div>
     </details>
     <button class="btn" id="quit">Beenden</button>
@@ -175,6 +216,20 @@
   <section class="table" id="table" hidden aria-label="Formate">
     <div class="sheets" id="sheets"></div>
     <div class="reasons" id="reasons"></div>
+  </section>
+
+  <section class="variants" id="variants" hidden aria-labelledby="variantsTitle">
+    <h2 id="variantsTitle">Varianten vergleichen</h2>
+    <p>Dasselbe Format mit anderen Grenzen für Farben und Mischrezepte. Farbabweichung: wie weit die gemalten Farben im Mittel vom Foto entfernt sind, kleiner ist näher. Klick auf eine Variante zeigt sie unten an; exportiert wird die angezeigte.</p>
+    <div class="variant-row" id="variantRow">
+      <form class="variant-add" id="variantAdd">
+        <strong>Variante hinzufügen</strong>
+        <div class="field"><label for="vFarben">Farben höchstens</label><input id="vFarben" type="number" min="2" max="48" value="30"></div>
+        <div class="field"><label for="vRezepte">Mischrezepte höchstens</label><input id="vRezepte" type="number" min="0" max="30" value="8"><small>Aufhellungen mit Weiß zählen nicht mit.</small></div>
+        <button class="btn primary" type="submit">Berechnen</button>
+        <p class="note" id="variantError" role="status"></p>
+      </form>
+    </div>
   </section>
 
   <section class="detail" id="detail" hidden>
@@ -201,7 +256,9 @@
     <aside class="colors">
       <div class="export">
         <button class="btn primary" id="exportBtn">Vorlage exportieren</button>
-        <small>Eine ZIP-Datei mit der Druckvorlage als PDF (Linien, Farbliste, Vorschau), der Vorlage als SVG, der Vorschau als PNG und der Farbliste als CSV.</small>
+        <label><input type="checkbox" id="noPots"> Neue Farben nicht als Töpfe speichern</label>
+        <small>Eine ZIP-Datei im Ordner <code>exported</code> mit der Druckvorlage als PDF (Linien, Farbliste, Vorschau), nur den Linien als eigenes PDF zum Drucken, der Vorlage als SVG, der Vorschau als PNG und der Farbliste als CSV.</small>
+        <small id="exportNote" role="status"></small>
       </div>
       <p id="colorsSummary"></p>
       <p class="note" id="placeholderNote" hidden>Die Farben sind Platzhalter, bis dein Ausstreichblatt kalibriert ist. Rezepte und Vorschau sind deshalb noch nicht verlässlich.</p>
@@ -215,11 +272,13 @@ const $ = id => document.getElementById(id);
 const fmtNum = (v, d = 0) => v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtGrams = g => g < 0.05 ? "< 0,1 g" : fmtNum(g, 1) + " g";
 const fmtCm = mm => fmtNum(mm / 10, 1).replace(",0", "");
-let job = null, status = null, chosen = null, lastFile = null, poll = null, zoom = 1;
+// chosen: the format; active: the plan shown below and exported, the format's own id or a variant's
+let job = null, status = null, chosen = null, active = null, lastFile = null, poll = null, zoom = 1;
 
 function params() {
   const q = new URLSearchParams();
   for (const k of ["farben", "rezepte", "min_breite", "min_engstelle"]) q.set(k, $(k).value);
+  q.set("weiss_lassen", $("weiss_lassen").checked ? "1" : "0");
   return q;
 }
 
@@ -228,8 +287,10 @@ function showError(msg) { $("error").textContent = msg; $("error").hidden = !msg
 async function upload(file) {
   lastFile = file;
   showError("");
-  chosen = null;
+  chosen = active = null;
   $("detail").hidden = true;
+  $("variants").hidden = true;
+  for (const el of document.querySelectorAll(".variant")) el.remove();  // ids repeat across photos
   $("drop").hidden = true;
   $("newPhoto").hidden = false;
   $("photoName").textContent = file.name;
@@ -255,9 +316,10 @@ async function refresh() {
   if (data.error) { clearInterval(poll); showError(data.error); }
   renderSheets(before);
   if (data.recommendation) {
-    clearInterval(poll);
+    if (!data.variants.some(v => !v.done && !v.error)) { clearInterval(poll); poll = null; }
     if (!chosen) choose(data.recommendation);
   }
+  renderVariants();
 }
 
 function sheetScale() {
@@ -311,31 +373,121 @@ function markChosen() {
     s.querySelector(".sheet").setAttribute("aria-pressed", String(s.dataset.fmt === chosen));
 }
 
-async function choose(fmt) {
+function choose(fmt) {
   chosen = fmt;
   markChosen();
-  const f = status.formats.find(x => x.fmt === fmt);
+  $("vFarben").value = status.base.farben;
+  $("vRezepte").value = status.base.rezepte;
+  $("variantError").textContent = "";
+  $("variants").hidden = false;
+  renderVariants();
+  show(fmt);
+}
+
+const limits = v => `bis ${v.farben} Farben, ${v.rezepte ? `bis ${v.rezepte} Rezepte` : "ohne Rezepte"}`;
+
+function variantList() {  // the chosen format: own settings first, then its variants
+  const f = status.formats.find(x => x.fmt === chosen);
+  return [{ id: chosen, ...status.base, done: f.done, error: null, summary: f.summary, own: true },
+          ...status.variants.filter(v => v.fmt === chosen)];
+}
+
+function renderVariants() {
+  if (!chosen || !status) return;
+  const list = variantList(), row = $("variantRow");
+  const [, , aw, ah] = status.formats.find(x => x.fmt === chosen).area_mm;
+  for (const el of row.querySelectorAll(".variant"))
+    if (!list.some(v => v.id === el.dataset.id)) el.remove();
+  for (const v of list) {
+    let card = row.querySelector(`.variant[data-id="${v.id}"]`);
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "variant";
+      card.dataset.id = v.id;
+      card.innerHTML = `<button class="variant-pick" disabled aria-pressed="false" aria-label="${limits(v)} anzeigen">
+          <div class="variant-img" style="aspect-ratio: ${aw} / ${ah}"><div class="pending"><span>wird berechnet</span></div></div>
+          <div class="caption"></div></button>`
+        + (v.own ? "" : `<button class="variant-remove" type="button">Entfernen</button>`);
+      card.querySelector(".variant-pick").addEventListener("click", () => show(v.id));
+      if (!v.own) card.querySelector(".variant-remove").addEventListener("click", () => removeVariant(v.id));
+      row.insertBefore(card, $("variantAdd"));
+    }
+    const pick = card.querySelector(".variant-pick");
+    if (v.done && pick.disabled) {  // set the image once: previews are not cached by the browser
+      card.querySelector(".variant-img").innerHTML = `<img alt="Vorschau ${limits(v)}" src="/api/jobs/${job}/${v.id}/preview.png">`;
+      pick.disabled = false;
+    }
+    if (v.error) card.querySelector(".variant-img").innerHTML = "";
+    pick.setAttribute("aria-pressed", String(v.id === active));
+    const s = v.summary;
+    card.querySelector(".caption").innerHTML = `<strong>${limits(v)}${v.own ? "<em>Einstellungen</em>" : ""}</strong>` + (s
+      ? `<p>${s.tubes} Tuben, ${s.tints} Aufhellungen, ${s.recipes} Rezepte</p>
+         <p>${fmtNum(s.regions)} Flächen, etwa ${fmtNum(s.hours)} Stunden, ${fmtNum(s.grams)} g</p>
+         <p>Farbabweichung ${fmtNum(s.color_error, 1)}</p>`
+      : `<p class="note">${v.error || ""}</p>`);
+  }
+  $("variantAdd").hidden = list.length >= 3;
+}
+
+async function removeVariant(id) {
+  await fetch(`/api/jobs/${job}/${id}`, { method: "DELETE" });
+  if (active === id) show(chosen);
+  await refresh();
+}
+
+async function show(id) {
+  active = id;
+  renderVariants();
+  $("exportNote").textContent = "";
+  const v = variantList().find(x => x.id === id);
+  const f = status.formats.find(x => x.fmt === chosen);
   const [pw, ph] = f.page_mm, [ax, ay, aw, ah] = f.area_mm;
-  $("detailTitle").textContent = `${fmt}, ${fmtCm(pw)} × ${fmtCm(ph)} cm`;
+  $("detailTitle").textContent = `${chosen}, ${fmtCm(pw)} × ${fmtCm(ph)} cm, ${limits(v)}`;
   $("page").style.aspectRatio = `${pw} / ${ph}`;
-  $("templateImg").src = `/api/jobs/${job}/${fmt}/template.svg`;
   const img = $("paintedImg");
-  img.src = `/api/jobs/${job}/${fmt}/preview.png`;
+  img.src = `/api/jobs/${job}/${id}/preview.png`;
   Object.assign(img.style, { left: ax / pw * 100 + "%", top: ay / ph * 100 + "%",
                              width: aw / pw * 100 + "%", height: ah / ph * 100 + "%" });
   applyWipe();
   applyZoom();
   $("detail").hidden = false;
-  const rows = await (await fetch(`/api/jobs/${job}/${fmt}/colors`)).json();
-  if (chosen !== fmt) return;
-  const grams = rows.reduce((s, r) => s + r.need, 0);
-  $("colorsSummary").textContent = `${rows.length} Farben, zusammen etwa ${fmtNum(grams)} g Farbe.`;
+  await loadNumbers(id);
+}
+
+// The numbers in the template and color list are pot numbers, so they follow the pot list.
+async function loadNumbers(id) {
+  $("templateImg").src = `/api/jobs/${job}/${id}/template.svg?t=${Date.now()}`;
+  const rows = await (await fetch(`/api/jobs/${job}/${id}/colors`)).json();
+  if (active !== id) return;
+  const grams = rows.reduce((s, r) => s + r.need, 0), inPot = rows.filter(r => r.in_pot).length;
+  $("colorsSummary").textContent = `${rows.length} Farben, davon ${inPot} schon im Topf`
+    + (inPot < rows.length ? ` und ${rows.length - inPot} neu (★: anmischen, in einen neuen Topf füllen)` : "")
+    + `, zusammen etwa ${fmtNum(grams)} g Farbe.`;
   $("placeholderNote").hidden = !status.placeholder;
-  $("colorList").innerHTML = rows.map(r => `<li>
+  $("colorList").innerHTML = rows.map(r => {
+    const sub = r.in_pot ? "schon im Topf" : r.weigh ? `abwiegen: ${r.weigh}` : "";
+    return `<li>
       <span class="swatch" style="background:${r.srgb}"></span>
       <span class="nr">${r.nr}</span>
-      <span class="what">${r.text}${r.weigh ? `<small>abwiegen: ${r.weigh}</small>` : ""}</span>
-      <span class="need">${fmtGrams(r.need)}</span></li>`).join("");
+      <span class="star"${r.in_pot ? "" : ' title="neuer Topf"'}>${r.in_pot ? "" : "★"}</span>
+      <span class="what">${r.text}${sub ? `<small>${sub}</small>` : ""}</span>
+      <span class="need">${fmtGrams(r.need)}</span></li>`;
+  }).join("");
+}
+
+async function loadPots() {
+  const data = await (await fetch("/api/pots")).json();
+  const n = data.pots.length;
+  $("potsBtn").textContent = `Töpfe (${n})`;
+  $("potsInfo").textContent = n
+    ? `${n} Töpfe, ${data.pots.filter(p => p.in_use !== false).length} davon in Verwendung (höchstens ${data.max}). Abgehakte Töpfe zählen nicht: neue Bilder bevorzugen sie nicht, ihre Nummern sind frei, und exportierst du mit Töpfen, ersetzt eine neue Farbe mit ihrer Nummer den abgehakten Topf. „löschen“: der Topf verschwindet ganz.`
+    : "Noch keine Töpfe. Beim Exportieren bekommt jede neue Farbe einen Topf mit fester Nummer.";
+  $("potList").innerHTML = data.pots.map(p => { const on = p.in_use !== false; return `<li class="${on ? "" : "off"}">
+      <span class="swatch" style="background:${p.srgb}"></span>
+      <span class="nr">${p.nr}</span>
+      <span class="what">${p.text}<small>${p.weigh ? `Topf füllen: ${p.weigh}<br>` : ""}seit ${p.source}</small></span>
+      <span class="pot-ctl"><label><input type="checkbox" data-use="${p.nr}"${on ? " checked" : ""}> verwenden</label>
+      <button class="variant-remove" type="button" data-nr="${p.nr}" aria-label="Topf ${p.nr} löschen">löschen</button></span></li>`; }).join("");
 }
 
 function applyWipe() {
@@ -363,17 +515,62 @@ document.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (
 $("wipe").addEventListener("input", applyWipe);
 for (const b of document.querySelectorAll(".zoom button"))
   b.addEventListener("click", () => { zoom = Number(b.dataset.zoom); applyZoom(); });
-for (const k of ["farben", "rezepte", "min_breite", "min_engstelle"])
+for (const k of ["farben", "rezepte", "min_breite", "min_engstelle", "weiss_lassen"])
   $(k).addEventListener("input", () => { $("recompute").disabled = !lastFile; });
 $("recompute").addEventListener("click", () => { $("settings").open = false; if (lastFile) upload(lastFile); });
-$("exportBtn").addEventListener("click", () => { location.href = `/api/jobs/${job}/${chosen}/export.zip`; });
+$("variantAdd").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("variantError").textContent = "";
+  const q = new URLSearchParams({ farben: $("vFarben").value, rezepte: $("vRezepte").value });
+  const res = await fetch(`/api/jobs/${job}/${chosen}/variants?` + q, { method: "POST" });
+  const data = await res.json();
+  if (!res.ok) { $("variantError").textContent = data.error; return; }
+  if (data.id === chosen) $("variantError").textContent = "Das sind deine aktuellen Einstellungen.";
+  await refresh();
+  if (!poll) poll = setInterval(refresh, 1000);
+});
+$("exportBtn").addEventListener("click", async () => {
+  $("exportBtn").disabled = true;
+  $("exportNote").textContent = "Wird exportiert …";
+  try {
+    const noPots = $("noPots").checked;
+    const res = await fetch(`/api/jobs/${job}/${active}/export?toepfe=${noPots ? 0 : 1}`, { method: "POST" });
+    const data = await res.json();
+    $("exportNote").textContent = res.ok ? `Gespeichert: ${data.file}` + (noPots ? " (Farben nicht als Töpfe gespeichert)" : "") : data.error;
+    if (res.ok) { await loadPots(); await loadNumbers(active); }  // its new colors now have pots
+  } catch {
+    $("exportNote").textContent = "Export fehlgeschlagen: die App läuft nicht mehr.";
+  }
+  $("exportBtn").disabled = false;
+});
 $("quit").addEventListener("click", async () => {
   clearInterval(poll);
   await fetch("/api/quit", { method: "POST" }).catch(() => {});
-  for (const id of ["drop", "table", "detail", "error"]) $(id).hidden = true;
+  for (const id of ["drop", "table", "variants", "detail", "error"]) $(id).hidden = true;
   for (const el of document.querySelectorAll("header .btn, header details")) el.hidden = true;
   $("stopped").hidden = false;
 });
+$("potList").addEventListener("click", async e => {
+  const nr = e.target.dataset.nr;
+  if (!nr || !confirm(`Topf ${nr} löschen? Die Nummer ${nr} bekommt dann die nächste neue Farbe.`)) return;
+  await fetch(`/api/pots/${nr}`, { method: "DELETE" });
+  await loadPots();
+  if (active) await loadNumbers(active);
+});
+$("potList").addEventListener("change", async e => {
+  const nr = e.target.dataset.use;
+  if (!nr) return;
+  await fetch(`/api/pots/${nr}/verwenden?an=${e.target.checked ? 1 : 0}`, { method: "POST" });
+  await loadPots();
+  if (active) await loadNumbers(active);  // the numbers follow the pots in use
+});
+for (const [id, on] of [["potsAllOn", 1], ["potsAllOff", 0]])
+  $(id).addEventListener("click", async () => {
+    await fetch(`/api/pots/verwenden?an=${on}`, { method: "POST" });
+    await loadPots();
+    if (active) await loadNumbers(active);
+  });
+loadPots();
 window.addEventListener("resize", () => { if (status) renderSheets(status); });
 </script>
 </body>

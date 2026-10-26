@@ -16,6 +16,9 @@ MIX_WHITE_PARTS = [0, 1, 2, 3, 5, 8, 12]
 # Judgment calls, in ΔE per pixel: where a tube is within this much of a tint
 # (or recipe), the tube wins. Encodes "tube first, then tint, then recipe".
 KIND_PENALTY = {TUBE: 0.0, TINT: 1.0, MIX: 2.5}
+# Judgment call, in ΔE per pixel: a color already in a pot needs no mixing and carries no
+# penalty at all; a new color needs a new pot and carries this much on top of the above.
+NEW_POT_PENALTY = 2.0  # replayed on 4 exports: 43 % fewer new pots, color error up to +0.7
 # CIEDE2000 lightness factor < 1: light/dark errors count more than hue errors.
 KL = 0.65
 
@@ -24,7 +27,8 @@ KL = 0.65
 GRAMS_PER_CM2 = 0.03
 AMOUNT_MARGIN = 1.3
 MIN_PART_G = 0.3  # smallest weighable part on a 0.01 g scale (about 3 % error)
-MIN_BATCH_G = 3.0
+# A new color is mixed to fill a pot completely: pots are reused in later templates.
+POT_G = 10.0
 
 
 def srgb_to_linear(rgb):
@@ -139,5 +143,5 @@ def amounts(recipe, area_cm2):
         return need, []
     frac = np.array([p for _, p in recipe], float)
     frac /= frac.sum()
-    batch = max(need, MIN_BATCH_G, MIN_PART_G / frac.min())
+    batch = max(need, POT_G, MIN_PART_G / frac.min())
     return need, list(frac * batch)

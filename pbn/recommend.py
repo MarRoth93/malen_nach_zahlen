@@ -27,6 +27,7 @@ class Summary:
     grams: float
     contours: float  # share of the photo's strong edges that survive as area borders
     source_ppm: float
+    color_error: float  # Plan.color_error
 
 
 def contours_kept(plan, width=1000):
@@ -43,12 +44,14 @@ def contours_kept(plan, width=1000):
 
 
 def summarize(plan, cand):
-    kinds = cand.kind[plan.colors]
-    area_cm2 = np.bincount(plan.labels.ravel(), minlength=len(plan.colors)) / PX_PER_MM ** 2 / 100
-    grams = sum(amounts(cand.recipes[c], a)[0] for c, a in zip(plan.colors, area_cm2))
-    return Summary(plan.fmt, plan.n_regions, plan.n_regions * MINUTES_PER_AREA / 60,
+    painted = plan.painted_colors
+    kinds = cand.kind[np.array(plan.colors)[painted]]
+    area_cm2 = np.bincount(plan.labels[plan.painted], minlength=len(plan.colors)) / PX_PER_MM ** 2 / 100
+    grams = sum(amounts(cand.recipes[plan.colors[k]], area_cm2[k])[0] for k in painted)
+    return Summary(plan.fmt, plan.n_painted, plan.n_painted * MINUTES_PER_AREA / 60,
                    int((kinds == TUBE).sum()), int((kinds == TINT).sum()),
-                   int((kinds == MIX).sum()), grams, contours_kept(plan), plan.source_ppm)
+                   int((kinds == MIX).sum()), grams, contours_kept(plan), plan.source_ppm,
+                   plan.color_error)
 
 
 def recommend(summaries):

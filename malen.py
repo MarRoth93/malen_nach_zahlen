@@ -11,6 +11,7 @@ from pathlib import Path
 from pbn.output import comparison_png, write_outputs
 from pbn.paints import build_candidates, load_palette
 from pbn.pipeline import FORMATS_MM, MIN_WIDTH_FLOOR_MM, Settings, load_photo, make_plan
+from pbn.pots import Pots, pot_candidates, room_error
 from pbn.recommend import summarize, recommend
 
 HERE = Path(__file__).resolve().parent
@@ -37,13 +38,17 @@ def main():
     p.add_argument("--farben", type=int, default=30, help="max. Anzahl Farben (Standard 30)")
     p.add_argument("--rezepte", type=int, default=8,
                    help="max. Farben nach Mischrezept, Aufhellungen nicht mitgezählt (Standard 8)")
-    p.add_argument("--min-breite", type=float, default=2.5,
+    p.add_argument("--min-breite", type=float, default=2.0,
                    help="jede Fläche muss an ihrer breitesten Stelle so breit sein, in mm "
-                        f"(Standard 2.5, mindestens {MIN_WIDTH_FLOOR_MM})")
-    p.add_argument("--min-engstelle", type=float, default=1.5,
+                        f"(Standard 2.0, mindestens {MIN_WIDTH_FLOOR_MM})")
+    p.add_argument("--min-engstelle", type=float, default=1.0,
                    help="schmalere Spitzen und Engstellen gehen an die Nachbarflächen, in mm "
-                        "(Standard 1.5)")
-    p.add_argument("--palette", type=Path, default=HERE / "palettes" / "platzhalter.json")
+                        "(Standard 1.0)")
+    p.add_argument("--weiss-lassen", action="store_true",
+                   help="weiße Flächen am Bildrand nicht bemalen: keine Zahl, keine Farbe")
+    p.add_argument("--ohne-toepfe", action="store_true",
+                   help="neue Farben nicht in die Topfliste aufnehmen (z. B. für einen Test)")
+    p.add_argument("--palette", type=Path, default=HERE / "palettes" / "gemessen.json")
     p.add_argument("--ausgabe", type=Path, default=HERE / "ausgabe")
     args = p.parse_args()
     if args.min_breite < MIN_WIDTH_FLOOR_MM:
@@ -56,9 +61,12 @@ def main():
     if pal.is_placeholder:
         print("Hinweis: Platzhalter-Farben – Vorschau und Rezepte sind noch nicht verlässlich.")
     cand = build_candidates(pal)
+    pots = Pots(HERE / "palettes" / "toepfe.json")
+    in_pots = pot_candidates(pots.keys(in_use_only=True), pal, cand)  # preferred when choosing the colors
     rgb = load_photo(args.foto)
     st = Settings(max_colors=args.farben, max_recipes=args.rezepte,
-                  min_width_mm=args.min_breite, min_neck_mm=args.min_engstelle)
+                  min_width_mm=args.min_breite, min_neck_mm=args.min_engstelle,
+                  blank_background=args.weiss_lassen)
     title = args.foto.stem
     out_dir = args.ausgabe / title
 
@@ -67,7 +75,7 @@ def main():
     for fmt in formats:
         t = time.time()
         print(f"Berechne {fmt} …", end=" ", flush=True)
-        plans[fmt] = make_plan(rgb, fmt, pal, cand, st)
+        plans[fmt] = make_plan(rgb, fmt, pal, cand, st, in_pots)
         print(f"{plans[fmt].n_regions} Flächen ({time.time() - t:.0f} s)")
 
     if args.format:
@@ -92,11 +100,19 @@ def main():
         print(f"\nVergleichsbild: {cmp_path}")
         fmt = ask_format(rec) if sys.stdin.isatty() else rec
 
-    pdf_path, rows = write_outputs(plans[fmt], pal, cand, out_dir, title)
+    numbering = pots.assign_plan(plans[fmt], pal, cand)
+    msg = room_error(*numbering)
+    if msg:
+        sys.exit(msg)
+    pdf_path, rows = write_outputs(plans[fmt], pal, cand, out_dir, title, numbering)
+    if not args.ohne_toepfe:
+        pots.register_plan(plans[fmt], pal, cand, numbering[0], f"{title}_{fmt}")
     print(f"\nFarbliste {fmt}:")
     for r in rows:
-        print(f"  {r['nr']:>2}  {r['text']:<60} ≈ {r['need']:.1f} g")
-        if r["weigh"]:
+        print(f"  {r['nr']:>2} {' ' if r['in_pot'] else '★'} {r['text']:<60} ≈ {r['need']:.1f} g")
+        if r["in_pot"]:
+            print("      schon im Topf")
+        elif r["weigh"]:
             print(f"      abwiegen: {r['weigh']}")
     print(f"\nVorlage: {pdf_path}")
     print(f"Vorschau: {out_dir / f'{fmt}_vorschau.png'}")

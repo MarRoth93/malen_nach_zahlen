@@ -10,7 +10,7 @@ from scipy.spatial import cKDTree
 from skimage import measure
 from sklearn.cluster import MiniBatchKMeans
 
-from .paints import KIND_PENALTY, KL, MIX, TUBE, color_distance, srgb_to_lab
+from .paints import KIND_PENALTY, KL, MIX, NEW_POT_PENALTY, TUBE, color_distance, srgb_to_lab
 
 FORMATS_MM = {"A4": (210, 297), "A3": (297, 420), "A2": (420, 594)}
 MARGIN_MM = 10
@@ -22,9 +22,10 @@ MIN_WIDTH_FLOOR_MM = 2.0  # a 2-digit number at the smallest font size (4.5 pt) 
 class Settings:
     max_colors: int = 30
     max_recipes: int = 8
-    min_width_mm: float = 2.5  # every area is at least this wide at its widest point
+    min_width_mm: float = 2.0  # every area is at least this wide at its widest point
     min_area_mm2: float = 8.0
-    min_neck_mm: float = 1.5  # narrower spikes and necks go to the surrounding areas
+    min_neck_mm: float = 1.0  # narrower spikes and necks go to the surrounding areas
+    blank_background: bool = False  # white areas touching the picture's edge stay unpainted
 
 
 @dataclass
@@ -40,10 +41,28 @@ class Plan:
     region_pos: np.ndarray  # (n + 1, 2) row, col of the number
     region_radius: np.ndarray  # (n + 1,) inscribed radius in px
     photo_L: np.ndarray  # (H, W) lightness of the cropped photo, for comparing formats
+    # Mean color distance (as used to choose the colors) between the painted areas and the
+    # smoothed photo, for comparing settings. Not for comparing formats: see contours_kept.
+    color_error: float
+    blank: np.ndarray  # (n + 1,) True: area left unpainted (white background): no number, no paint
 
     @property
     def n_regions(self):
         return len(self.region_color) - 1
+
+    @property
+    def painted(self):
+        """(H, W) True where paint goes."""
+        return ~self.blank[self.regions]
+
+    @property
+    def painted_colors(self):
+        """Indices into colors that are painted somewhere; only these get a number and a pot."""
+        return sorted(set(self.region_color[1:][~self.blank[1:]].tolist()))
+
+    @property
+    def n_painted(self):
+        return int((~self.blank[1:]).sum())
 
 
 def load_photo(path):
@@ -100,13 +119,13 @@ def color_targets(lab, n=256, sample=120_000, seed=0):
     return km.cluster_centers_[keep], w[keep] / w.sum()
 
 
-def candidate_pool(cand, targets):
-    """All tubes and tints, plus the recipes closest to each target color."""
+def candidate_pool(cand, targets, pots=()):
+    """All tubes, tints and pots, plus the recipes closest to each target color."""
     mix_ids = np.flatnonzero(cand.kind == MIX)
     scale = np.array([1 / KL, 1, 1])
     _, nn = cKDTree(cand.lab[mix_ids] * scale).query(targets * scale, k=4)
     mixes = np.unique(mix_ids[nn.ravel()])
-    return np.concatenate([np.flatnonzero(cand.kind != MIX), mixes])
+    return np.unique(np.concatenate([np.flatnonzero(cand.kind != MIX), mixes, np.asarray(pots, int)]))
 
 
 def select_colors(D, w, kinds, max_colors, max_recipes, min_gain=1e-4):
@@ -302,7 +321,8 @@ def remove_small(labels, min_area_px, min_width_px, neck_px):
     raise RuntimeError("Kleine Flächen ließen sich nicht vollständig entfernen")
 
 
-def make_plan(rgb, fmt, pal, cand, st):
+def make_plan(rgb, fmt, pal, cand, st, pots=()):
+    """pots: candidate indices of the colors already in pots (pbn.pots.pot_candidates)."""
     landscape = rgb.shape[1] > rgb.shape[0]
     page, area = layout(fmt, landscape)
     work, source_ppm = fit_to_area(rgb, area[2], area[3])
@@ -317,8 +337,9 @@ def make_plan(rgb, fmt, pal, cand, st):
     lab = fit_lightness(srgb_to_lab(smooth), lo, hi, L_dark, L_white)
 
     targets, w = color_targets(lab)
-    pool = candidate_pool(cand, targets)
-    penalty = np.array([KIND_PENALTY[k] for k in cand.kind[pool]])
+    pool = candidate_pool(cand, targets, pots)
+    penalty = np.array([KIND_PENALTY[k] + NEW_POT_PENALTY for k in cand.kind[pool]])
+    penalty[np.isin(pool, pots)] = 0.0
     D = color_distance(targets[:, None], cand.lab[pool][None]) + penalty
     chosen = pool[select_colors(D, w, cand.kind[pool], st.max_colors, st.max_recipes)]
 
@@ -328,6 +349,7 @@ def make_plan(rgb, fmt, pal, cand, st):
     labels = merge_small(labels, lab, cand.lab[chosen], min_area_px, min_width_px)
     labels, regions, clear = remove_small(labels, min_area_px, min_width_px,
                                         st.min_neck_mm * PX_PER_MM)
+    color_error = float(color_distance(lab[::4, ::4], cand.lab[chosen][labels[::4, ::4]]).mean())
 
     # Number the colors that survived: tubes, then tints, then recipes, dark to light.
     used = np.unique(labels)
@@ -344,5 +366,10 @@ def make_plan(rgb, fmt, pal, cand, st):
     pos[1:] = ndi.maximum_position(clear, regions, ids)
     radius = np.zeros(n + 1)
     radius[1:] = ndi.maximum(clear, regions, ids)
+    blank = np.zeros(n + 1, bool)
+    if st.blank_background and pal.white in chosen[order]:
+        white = list(chosen[order]).index(pal.white)  # the white paint itself, not a tint
+        edge = np.unique(np.concatenate([regions[0], regions[-1], regions[:, 0], regions[:, -1]]))
+        blank[edge] = region_color[edge] == white
     return Plan(fmt, page, area, source_ppm, [int(chosen[k]) for k in order], labels, regions,
-                region_color, pos, radius, raw_lab[..., 0].astype(np.float32))
+                region_color, pos, radius, raw_lab[..., 0].astype(np.float32), color_error, blank)
